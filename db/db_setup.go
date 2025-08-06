@@ -2,7 +2,7 @@ package db
 
 import (
 	"fmt"
-	"tapirus_lite/models"
+	"tapirus_lite/internal/domain/entities"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -13,12 +13,12 @@ func DBSetup() *gorm.DB {
 	if err != nil {
 		panic("Error conectando a SQLite: " + err.Error())
 	}
-	db.AutoMigrate(&models.Product{}, &models.Client{}, &models.Order{}, &models.OrderItem{})
+	db.AutoMigrate(&entities.Product{}, &entities.Client{}, &entities.Order{}, &entities.OrderItem{})
 
 	var count int64
-	db.Model(&models.Client{}).Count(&count)
+	db.Model(&entities.Client{}).Count(&count)
 	if count == 0 {
-		defaultClient := models.Client{
+		defaultClient := entities.Client{
 			Name: "Consumidor final",
 		}
 		if err := db.Create(&defaultClient).Error; err != nil {

@@ -5,9 +5,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"tapirus_lite/internal/domain/entities"
 	"time"
-
-	"tapirus_lite/models"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -19,11 +18,11 @@ import (
 	"gorm.io/gorm"
 )
 
-func NewOrderForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, order *models.Order) {
+func NewOrderForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, order *entities.Order) {
 	orderWindow := fyne.CurrentApp().NewWindow("Nuevo Pedido")
 	orderWindow.Resize(fyne.NewSize(800, 600))
 
-	var clients []models.Client
+	var clients []entities.Client
 	db.Find(&clients)
 	sort.Slice(clients, func(i, j int) bool { return clients[i].Name < clients[j].Name })
 	clientNames := make([]string, len(clients))
@@ -33,7 +32,7 @@ func NewOrderForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, order *
 		clientIDs[c.Name] = c.ID
 	}
 
-	var products []models.Product
+	var products []entities.Product
 	db.Find(&products)
 	sort.Slice(products, func(i, j int) bool { return products[i].Name < products[j].Name })
 	productNames := make([]string, len(products))
@@ -411,7 +410,7 @@ func NewOrderForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, order *
 			return
 		}
 
-		var orderItems []models.OrderItem
+		var orderItems []entities.OrderItem
 		totalAmount := 0.0
 		for _, item := range items {
 			qty, err := strconv.ParseFloat(item.cantidad.Text, 64)
@@ -423,7 +422,7 @@ func NewOrderForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, order *
 				continue
 			}
 			price := productPrices[item.producto.Text]
-			orderItems = append(orderItems, models.OrderItem{
+			orderItems = append(orderItems, entities.OrderItem{
 				ProductID: prodID,
 				Quantity:  qty,
 			})
@@ -440,7 +439,7 @@ func NewOrderForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, order *
 			dialog.ShowError(fmt.Errorf("cliente no encontrado"), orderWindow)
 			return
 		}
-		var client models.Client
+		var client entities.Client
 		db.First(&client, clientID)
 
 		if isEdit {
@@ -450,13 +449,13 @@ func NewOrderForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, order *
 			order.Note = notaEntry.Text
 			order.Amount = totalAmount
 			db.Save(order)
-			db.Where("order_id = ?", order.ID).Delete(&models.OrderItem{})
+			db.Where("order_id = ?", order.ID).Delete(&entities.OrderItem{})
 			for i := range orderItems {
 				orderItems[i].OrderID = order.ID
 			}
 			db.Create(&orderItems)
 		} else {
-			newOrder := models.Order{
+			newOrder := entities.Order{
 				ClientID:     clientID,
 				ClientName:   client.Name,
 				DeliveryDate: fecha,

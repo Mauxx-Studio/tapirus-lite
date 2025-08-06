@@ -2,7 +2,8 @@ package components
 
 import (
 	"fmt"
-	"tapirus_lite/models"
+	"tapirus_lite/internal/domain/entities"
+
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -49,15 +50,15 @@ type summary struct {
 	notes    string
 }
 
-func getOrdersBetween(db *gorm.DB, start, end time.Time) []models.Order {
-	var orders []models.Order
+func getOrdersBetween(db *gorm.DB, start, end time.Time) []entities.Order {
+	var orders []entities.Order
 	db.Preload("Items.Product").
 		Where("delivery_date >= ? AND delivery_date < ? AND completed = ?", start, end, false).
 		Find(&orders)
 	return orders
 }
 
-func summarizeOrders(db *gorm.DB, orders []models.Order) summary {
+func summarizeOrders(db *gorm.DB, orders []entities.Order) summary {
 	productTotals := make(map[uint]struct {
 		qty  float64 // Cambiado de int a float64
 		unit string
@@ -77,7 +78,7 @@ func summarizeOrders(db *gorm.DB, orders []models.Order) summary {
 
 	var products string
 	for id, total := range productTotals {
-		var p models.Product
+		var p entities.Product
 		if err := db.First(&p, id).Error; err != nil {
 			products += fmt.Sprintf("Producto ID %d no encontrado: %.2f %s\n", id, total.qty, total.unit)
 			continue

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
-	"tapirus_lite/models"
+	"tapirus_lite/internal/domain/entities"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -14,7 +14,7 @@ import (
 
 func OrderList(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button) {
 
-	var orders []models.Order
+	var orders []entities.Order
 	db.Preload("Items.Product").Find(&orders)
 	sort.Slice(orders, func(i, j int) bool {
 		return orders[i].DeliveryDate.Before(orders[j].DeliveryDate)
@@ -102,7 +102,7 @@ func OrderList(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button) {
 }
 
 func ProductList(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button) {
-	var products []models.Product
+	var products []entities.Product
 	db.Find(&products)
 
 	dataTable := widget.NewTable(
@@ -187,7 +187,7 @@ func ProductList(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button) {
 }
 
 func ClientList(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button) {
-	var clients []models.Client
+	var clients []entities.Client
 	db.Find(&clients)
 
 	dataTable := widget.NewTable(

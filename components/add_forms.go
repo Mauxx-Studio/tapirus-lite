@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"tapirus_lite/models"
+	"tapirus_lite/internal/domain/entities"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -13,7 +13,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func NewProductForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, product *models.Product) {
+func NewProductForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, product *entities.Product) {
 	// Campos del formulario
 	idLabel := widget.NewLabel("")
 	nombreEntry := widget.NewEntry()
@@ -106,7 +106,7 @@ func NewProductForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, produ
 			product.Unit = unidad
 			db.Save(product)
 		} else {
-			newProduct := models.Product{
+			newProduct := entities.Product{
 				Name:        nombre,
 				Description: descripcionEntry.Text,
 				Price:       precio,
@@ -144,7 +144,7 @@ func NewProductForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, produ
 	popup.Show()
 }
 
-func NewClientForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, client *models.Client) {
+func NewClientForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, client *entities.Client) {
 	// Campos del formulario
 	idLabel := widget.NewLabel("")
 	nombreEntry := widget.NewEntry()
@@ -226,7 +226,7 @@ func NewClientForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, client
 			client.Address = direccionEntry.Text
 			db.Save(client)
 		} else {
-			newClient := models.Client{
+			newClient := entities.Client{
 				Name:    nombre,
 				Phone:   telefonoEntry.Text,
 				Email:   emailEntry.Text,
