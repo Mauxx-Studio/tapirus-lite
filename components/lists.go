@@ -4,18 +4,20 @@ import (
 	"fmt"
 	"math"
 	"sort"
-	"tapirus_lite/internal/domain/entities"
+	"tapirus_lite/internal/domain/services"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
-	"gorm.io/gorm"
 )
 
-func OrderList(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button) {
+func OrderList(orderService *services.OrderService, w fyne.Window, nuevoBoton *widget.Button) fyne.CanvasObject {
+	// Obtener Pedidos desde el servicio
+	orders, err := orderService.GetAllOrders()
+	if err != nil {
+		return widget.NewLabel(fmt.Sprintf("error al cargar pedidos: %v", err))
+	}
 
-	var orders []entities.Order
-	db.Preload("Items.Product").Find(&orders)
 	sort.Slice(orders, func(i, j int) bool {
 		return orders[i].DeliveryDate.Before(orders[j].DeliveryDate)
 	})
@@ -84,7 +86,7 @@ func OrderList(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button) {
 
 	dataTable.OnSelected = func(id widget.TableCellID) {
 		if id.Row >= 0 && id.Row < len(orders) {
-			NewOrderForm(db, w, nuevoBoton, &orders[id.Row]) // Modo edición
+			NewOrderForm(orderService, w, nuevoBoton, &orders[id.Row]) // Modo edición
 			dataTable.Unselect(id)
 		}
 	}
@@ -95,15 +97,18 @@ func OrderList(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button) {
 		widget.NewSeparator(),
 	)
 
-	w.Content().(*fyne.Container).Objects[0] = container.NewBorder(headerWithSeparator, nil, nil, nil, container.NewScroll(dataTable))
-	w.Content().Refresh()
 	nuevoBoton.SetText("Nuevo Pedido")
-	nuevoBoton.OnTapped = func() { NewOrderForm(db, w, nuevoBoton, nil) } // Modo creación
+	nuevoBoton.OnTapped = func() { NewOrderForm(orderService, w, nuevoBoton, nil) } // Modo creación
+
+	return container.NewBorder(headerWithSeparator, nil, nil, nil, container.NewScroll(dataTable))
 }
 
-func ProductList(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button) {
-	var products []entities.Product
-	db.Find(&products)
+func ProductList(productService *services.ProductService, w fyne.Window, nuevoBoton *widget.Button) fyne.CanvasObject {
+	// Obtener Productos
+	products, err := productService.GetAllProducts()
+	if err != nil {
+		return widget.NewLabel(fmt.Sprintf("error al cargar productos: %v", err))
+	}
 
 	dataTable := widget.NewTable(
 		func() (int, int) { return len(products) + 1, 4 },
@@ -169,7 +174,7 @@ func ProductList(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button) {
 
 	dataTable.OnSelected = func(id widget.TableCellID) {
 		if id.Row >= 0 && id.Row < len(products) {
-			NewProductForm(db, w, nuevoBoton, &products[id.Row]) // Pasamos el producto para edición
+			NewProductForm(productService, w, nuevoBoton, &products[id.Row]) // Pasamos el producto para edición
 			dataTable.Unselect(id)
 		}
 	}
@@ -180,15 +185,18 @@ func ProductList(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button) {
 		widget.NewSeparator(),
 	)
 
-	w.Content().(*fyne.Container).Objects[0] = container.NewBorder(headerWithSeparator, nil, nil, nil, container.NewScroll(dataTable))
-	w.Content().Refresh()
 	nuevoBoton.SetText("Nuevo Producto")
-	nuevoBoton.OnTapped = func() { NewProductForm(db, w, nuevoBoton, nil) } // Nil para modo creación
+	nuevoBoton.OnTapped = func() { NewProductForm(productService, w, nuevoBoton, nil) } // Nil para modo creación
+
+	return container.NewBorder(headerWithSeparator, nil, nil, nil, container.NewScroll(dataTable))
 }
 
-func ClientList(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button) {
-	var clients []entities.Client
-	db.Find(&clients)
+func ClientList(clientService *services.ClientService, w fyne.Window, nuevoBoton *widget.Button) fyne.CanvasObject {
+	// Obtener clientes
+	clients, err := clientService.GetAllClients()
+	if err != nil {
+		return widget.NewLabel(fmt.Sprintf("error al obtener clientes; %v", err))
+	}
 
 	dataTable := widget.NewTable(
 		func() (int, int) { return len(clients) + 1, 4 },
@@ -253,7 +261,7 @@ func ClientList(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button) {
 
 	dataTable.OnSelected = func(id widget.TableCellID) {
 		if id.Row >= 0 && id.Row < len(clients) {
-			NewClientForm(db, w, nuevoBoton, &clients[id.Row]) // Modo edición
+			NewClientForm(clientService, w, nuevoBoton, &clients[id.Row]) // Modo edición
 			dataTable.Unselect(id)
 		}
 	}
@@ -265,8 +273,8 @@ func ClientList(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button) {
 		widget.NewSeparator(),
 	)
 
-	w.Content().(*fyne.Container).Objects[0] = container.NewBorder(headerWithSeparator, nil, nil, nil, container.NewScroll(dataTable))
-	w.Content().Refresh()
 	nuevoBoton.SetText("Nuevo Cliente")
-	nuevoBoton.OnTapped = func() { NewClientForm(db, w, nuevoBoton, nil) } // Modo creación
+	nuevoBoton.OnTapped = func() { NewClientForm(clientService, w, nuevoBoton, nil) } // Modo creación
+
+	return container.NewBorder(headerWithSeparator, nil, nil, nil, container.NewScroll(dataTable))
 }

@@ -3,6 +3,7 @@ package components
 import (
 	"fmt"
 	"tapirus_lite/internal/domain/entities"
+	"tapirus_lite/internal/domain/services"
 
 	"time"
 
@@ -12,10 +13,10 @@ import (
 	"gorm.io/gorm"
 )
 
-func ShowMainScreen(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button) {
+func ShowMainScreen(orderService *services.OrderService, w fyne.Window, nuevoBoton *widget.Button) {
 	nuevoBoton.SetText("Nuevo Pedido")
-	nuevoBoton.OnTapped = func() { NewOrderForm(db, w, nuevoBoton, nil) }
-	w.Content().(*fyne.Container).Objects[0] = container.NewScroll(MainSummary(db, w))
+	nuevoBoton.OnTapped = func() { NewOrderForm(orderService, w, nuevoBoton, nil) }
+	//	w.Content().(*fyne.Container).Objects[0] = container.NewScroll(MainSummary(db, w))
 	w.Content().Refresh()
 }
 

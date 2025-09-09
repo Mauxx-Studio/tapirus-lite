@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"tapirus_lite/internal/domain/entities"
+	"tapirus_lite/internal/domain/services"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -15,15 +16,19 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	xWidget "fyne.io/x/fyne/widget"
-	"gorm.io/gorm"
 )
 
-func NewOrderForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, order *entities.Order) {
+func NewOrderForm(orderService *services.OrderService, w fyne.Window, nuevoBoton *widget.Button, order *entities.Order) {
 	orderWindow := fyne.CurrentApp().NewWindow("Nuevo Pedido")
 	orderWindow.Resize(fyne.NewSize(800, 600))
 
-	var clients []entities.Client
-	db.Find(&clients)
+	// Obtener clientes y productos desde el servicio
+	clients, err := orderService.GetAllClients()
+	if err != nil {
+		dialog.ShowError(fmt.Errorf("error al cargar clientes: %v"+err.Error()), orderWindow)
+		return
+	}
+
 	sort.Slice(clients, func(i, j int) bool { return clients[i].Name < clients[j].Name })
 	clientNames := make([]string, len(clients))
 	clientIDs := make(map[string]uint)
@@ -32,8 +37,11 @@ func NewOrderForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, order *
 		clientIDs[c.Name] = c.ID
 	}
 
-	var products []entities.Product
-	db.Find(&products)
+	products, err := orderService.GetAllProducts()
+	if err != nil {
+		dialog.ShowError(fmt.Errorf("error al cargar productos: %v", err), orderWindow)
+	}
+
 	sort.Slice(products, func(i, j int) bool { return products[i].Name < products[j].Name })
 	productNames := make([]string, len(products))
 	productIDs := make(map[string]uint)
@@ -46,6 +54,7 @@ func NewOrderForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, order *
 		productUnits[p.Name] = p.Unit
 	}
 
+	// Campos del formulario
 	idLabel := widget.NewLabel("crear")
 	clientEntry := xWidget.NewCompletionEntry([]string{})
 	clientEntry.SetText("Consumidor final")
@@ -74,6 +83,7 @@ func NewOrderForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, order *
 	fechaEntry.SetText(time.Now().Format("2006-01-02 15:04"))
 	notaEntry := widget.NewMultiLineEntry()
 
+	// Modo creación o edición
 	isEdit := order != nil
 	if isEdit {
 		orderWindow.SetTitle("Editar Pedido")
@@ -91,6 +101,7 @@ func NewOrderForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, order *
 	topLayout := &FormLayout{separator: 4, margin: 12, minEntryWidth: 150}
 	topContainer := container.New(topLayout, topItems...)
 
+	// Estructura para ítems del pedido
 	type ItemRow struct {
 		numLabel     *widget.Label
 		cantidad     *widget.Label
@@ -109,6 +120,7 @@ func NewOrderForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, order *
 		minDynWidth: 150,
 	}
 
+	// Encabezados para la tabla de ítems
 	numHeader := widget.NewLabel("Nº")
 	qtyHeader := widget.NewLabel("Cantidad")
 	unitHeader := widget.NewLabel("")
@@ -118,6 +130,7 @@ func NewOrderForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, order *
 	deleteHeader := widget.NewLabel("")
 	header := container.New(rowLayout, numHeader, qtyHeader, unitHeader, prodHeader, priceHeader, montoHeader, deleteHeader)
 
+	// Calcular el monto total
 	totalLabel := widget.NewLabel("0.00")
 	updateTotal := func() {
 		total := 0.0
@@ -129,6 +142,7 @@ func NewOrderForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, order *
 		totalLabel.SetText(fmt.Sprintf("%.2f", total))
 	}
 
+	// Eliminar un ítem
 	deleteItem := func(index int) {
 		if index < 0 || index >= len(items) {
 			return
@@ -159,6 +173,7 @@ func NewOrderForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, order *
 		}
 	}
 
+	// Cargar ítems en modo Edición
 	if isEdit && order != nil && len(order.Items) > 0 {
 		for i, item := range order.Items {
 			numLabel := widget.NewLabel(fmt.Sprintf("%d", i+1))
@@ -186,6 +201,7 @@ func NewOrderForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, order *
 		updateTotal()
 	}
 
+	// Botón para agregar ítems
 	addItemButton := widget.NewButton("Agregar Ítem", func() {
 		productoEntry := xWidget.NewCompletionEntry(productNames)
 		productoEntry.SetPlaceHolder("Seleccione un producto...")
@@ -398,20 +414,16 @@ func NewOrderForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, order *
 		}
 	})
 
+	// Lógica del botón Guardar
 	saveButton.OnTapped = func() {
 		fecha, err := time.Parse("2006-01-02 15:04", fechaEntry.Text)
 		if err != nil {
 			dialog.ShowError(fmt.Errorf("fecha inválida"), orderWindow)
 			return
 		}
-		clientText := clientEntry.Text
-		if clientText == "" {
-			dialog.ShowError(fmt.Errorf("debe ingresar un cliente"), orderWindow)
-			return
-		}
 
+		// Preparar ítems del pedido
 		var orderItems []entities.OrderItem
-		totalAmount := 0.0
 		for _, item := range items {
 			qty, err := strconv.ParseFloat(item.cantidad.Text, 64)
 			if err != nil || qty <= 0 || item.producto.Text == "" {
@@ -421,55 +433,37 @@ func NewOrderForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, order *
 			if !ok {
 				continue
 			}
-			price := productPrices[item.producto.Text]
 			orderItems = append(orderItems, entities.OrderItem{
 				ProductID: prodID,
 				Quantity:  qty,
 			})
-			totalAmount += qty * price
 		}
 
-		if len(orderItems) == 0 {
-			dialog.ShowError(fmt.Errorf("debe ingresar al menos un ítem"), orderWindow)
-			return
-		}
-
+		// Validar cliente
+		clientText := clientEntry.Text
 		clientID, ok := clientIDs[clientText]
 		if !ok {
 			dialog.ShowError(fmt.Errorf("cliente no encontrado"), orderWindow)
 			return
 		}
-		var client entities.Client
-		db.First(&client, clientID)
 
+		// Crear o actualizar el pedido usando el servicio
+		var newOrder *entities.Order
 		if isEdit {
-			order.ClientID = clientID
-			order.ClientName = client.Name
-			order.DeliveryDate = fecha
-			order.Note = notaEntry.Text
-			order.Amount = totalAmount
-			db.Save(order)
-			db.Where("order_id = ?", order.ID).Delete(&entities.OrderItem{})
-			for i := range orderItems {
-				orderItems[i].OrderID = order.ID
-			}
-			db.Create(&orderItems)
+			err = orderService.UpdateOrder(order, clientID, orderItems, fecha, notaEntry.Text)
 		} else {
-			newOrder := entities.Order{
-				ClientID:     clientID,
-				ClientName:   client.Name,
-				DeliveryDate: fecha,
-				Note:         notaEntry.Text,
-				Completed:    false,
-				Amount:       totalAmount,
-				Items:        orderItems,
-			}
-			db.Create(&newOrder)
+			newOrder, err = orderService.CreateOrder(clientID, orderItems, fecha, notaEntry.Text)
+		}
+		if err != nil {
+			dialog.ShowError(err, orderWindow)
+			return
+		}
+		if !isEdit {
 			idLabel.SetText(fmt.Sprintf("%07d", newOrder.ID))
 		}
 
 		dialog.ShowInformation("Éxito", "Pedido guardado", orderWindow)
-		OrderList(db, w, nuevoBoton)
+		OrderList(orderService, w, nuevoBoton)
 		orderWindow.Close()
 	}
 
@@ -477,9 +471,11 @@ func NewOrderForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, order *
 		deleteButton.OnTapped = func() {
 			dialog.ShowConfirm("Confirmar", "¿Eliminar este pedido?", func(confirmed bool) {
 				if confirmed {
-					db.Delete(order)
+					if err := orderService.DeleteOrder(order); err != nil {
+						dialog.ShowError(err, orderWindow)
+					}
 					dialog.ShowInformation("Éxito", "Pedido eliminado", orderWindow)
-					OrderList(db, w, nuevoBoton)
+					OrderList(orderService, w, nuevoBoton)
 					orderWindow.Close()
 				}
 			}, orderWindow)

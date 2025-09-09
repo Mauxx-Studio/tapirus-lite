@@ -3,17 +3,16 @@ package components
 import (
 	"fmt"
 	"strconv"
-	"strings"
 	"tapirus_lite/internal/domain/entities"
+	"tapirus_lite/internal/domain/services"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
-	"gorm.io/gorm"
 )
 
-func NewProductForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, product *entities.Product) {
+func NewProductForm(productService *services.ProductService, w fyne.Window, nuevoBoton *widget.Button, product *entities.Product) {
 	// Campos del formulario
 	idLabel := widget.NewLabel("")
 	nombreEntry := widget.NewEntry()
@@ -81,43 +80,25 @@ func NewProductForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, produ
 
 	// Lógica del botón Guardar con validaciones simplificadas
 	saveButton.OnTapped = func() {
-		// Validaciones mínimas
-		nombre := strings.TrimSpace(nombreEntry.Text)
-		unidad := strings.TrimSpace(unidadEntry.Text)
-		if len(nombre) <= 2 {
-			dialog.ShowError(fmt.Errorf("el nombre debe tener más de 2 letras"), w)
-			return
-		}
-		if unidad == "" {
-			dialog.ShowError(fmt.Errorf("la unidad no puede estar vacía"), w)
-			return
-		}
-
 		// Parseo con valores por defecto
 		precio, _ := strconv.ParseFloat(precioEntry.Text, 64)
 		disponibilidad, _ := strconv.Atoi(disponibilidadEntry.Text)
 
+		var err error
+
 		// Guardar o crear el producto
 		if isEdit {
-			product.Name = nombre
-			product.Description = descripcionEntry.Text
-			product.Price = precio
-			product.Stock = disponibilidad
-			product.Unit = unidad
-			db.Save(product)
+			//Actualizar producto
+			_ = productService.UpdateProduct(product, nombreEntry.Text, descripcionEntry.Text, unidadEntry.Text, precio, disponibilidad)
 		} else {
-			newProduct := entities.Product{
-				Name:        nombre,
-				Description: descripcionEntry.Text,
-				Price:       precio,
-				Stock:       disponibilidad,
-				Unit:        unidad,
-				TotalSold:   0,
+			//Crear producto
+			var newProduct *entities.Product
+			newProduct, err = productService.CreateProduct(nombreEntry.Text, descripcionEntry.Text, unidadEntry.Text, precio, disponibilidad)
+			if err != nil {
+				idLabel.SetText(fmt.Sprintf("%05d", newProduct.ID))
 			}
-			db.Create(&newProduct)
-			idLabel.SetText(fmt.Sprintf("%05d", newProduct.ID))
 		}
-		ProductList(db, w, nuevoBoton)
+		ProductList(productService, w, nuevoBoton) // <= Actualizar ProductList en list.go
 		popup.Hide()
 	}
 
@@ -131,9 +112,12 @@ func NewProductForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, produ
 		deleteButton.OnTapped = func() {
 			dialog.ShowConfirm("Confirmar", "¿Eliminar este producto?", func(confirmed bool) {
 				if confirmed {
-					db.Delete(product)
+					if err := productService.DeleteProduct(product); err != nil {
+						dialog.ShowError(err, w)
+						return
+					}
 					dialog.ShowInformation("Éxito", "Producto eliminado", w)
-					ProductList(db, w, nuevoBoton)
+					ProductList(productService, w, nuevoBoton) // <= Actualizar ProductList en list.go
 					popup.Hide()
 				}
 			}, w)
@@ -144,7 +128,7 @@ func NewProductForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, produ
 	popup.Show()
 }
 
-func NewClientForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, client *entities.Client) {
+func NewClientForm(clientService *services.ClientService, w fyne.Window, nuevoBoton *widget.Button, client *entities.Client) {
 	// Campos del formulario
 	idLabel := widget.NewLabel("")
 	nombreEntry := widget.NewEntry()
@@ -212,31 +196,23 @@ func NewClientForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, client
 
 	// Lógica del botón Guardar con validación mínima
 	saveButton.OnTapped = func() {
-		nombre := strings.TrimSpace(nombreEntry.Text)
-		if len(nombre) <= 2 {
-			dialog.ShowError(fmt.Errorf("el nombre debe tener más de 2 letras"), w)
-			return
-		}
+		var err error
 
 		if isEdit {
-			client.Name = nombre
-			client.Phone = telefonoEntry.Text
-			client.Email = emailEntry.Text
-			client.CUIT = cuitEntry.Text
-			client.Address = direccionEntry.Text
-			db.Save(client)
+			//Actualizar cliente
+			err = clientService.UpdateClient(client, nombreEntry.Text, telefonoEntry.Text, emailEntry.Text, cuitEntry.Text, direccionEntry.Text)
 		} else {
-			newClient := entities.Client{
-				Name:    nombre,
-				Phone:   telefonoEntry.Text,
-				Email:   emailEntry.Text,
-				CUIT:    cuitEntry.Text,
-				Address: direccionEntry.Text,
+			//Crear cliente
+			var newClient *entities.Client
+			newClient, err = clientService.CreateClient(nombreEntry.Text, telefonoEntry.Text, emailEntry.Text, cuitEntry.Text, direccionEntry.Text)
+			if err != nil {
+				idLabel.SetText(fmt.Sprintf("%05d", newClient.ID))
 			}
-			db.Create(&newClient)
-			idLabel.SetText(fmt.Sprintf("%05d", newClient.ID))
 		}
-		ClientList(db, w, nuevoBoton)
+		if err != nil {
+			dialog.ShowError(err, w)
+		}
+		ClientList(clientService, w, nuevoBoton) // <= Actualizar ClientList en list.go
 		popup.Hide()
 	}
 
@@ -250,9 +226,13 @@ func NewClientForm(db *gorm.DB, w fyne.Window, nuevoBoton *widget.Button, client
 		deleteButton.OnTapped = func() {
 			dialog.ShowConfirm("Confirmar", "¿Eliminar este cliente?", func(confirmed bool) {
 				if confirmed {
-					db.Delete(client)
+					if err := clientService.DeleteClient(client); err != nil {
+						dialog.ShowError(err, w)
+						return
+					}
+
 					dialog.ShowInformation("Éxito", "Cliente eliminado", w)
-					ClientList(db, w, nuevoBoton)
+					ClientList(clientService, w, nuevoBoton) // <= Actualizar ClientList en list.go
 					popup.Hide()
 				}
 			}, w)
